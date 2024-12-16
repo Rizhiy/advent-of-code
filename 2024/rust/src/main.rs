@@ -115,6 +115,11 @@ fn main() {
         .read_line(&mut input)
         .expect("Failed to read input");
 
+    input = input.trim().to_string();
+    if input.is_empty() {
+        input = "data".to_string();
+    }
+
     let data_dir = Path::new(input.trim());
     day1(data_dir);
     day2(data_dir);
