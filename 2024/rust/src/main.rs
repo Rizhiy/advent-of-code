@@ -104,7 +104,61 @@ fn day2(data_dir: &Path) {
         .filter(|x| *x)
         .count();
 
-    println!("Day2, part2: {}", valid_with_dampner);
+    println!("Day 2, part2: {}", valid_with_dampner);
+}
+
+fn day3(data_dir: &Path) {
+    let contents = read_file(data_dir, 3);
+
+    let mut parts: Vec<(i32, i32)> = Vec::new();
+
+    let mut enabled = true;
+    let mut enabled_parts: Vec<(i32, i32)> = Vec::new();
+
+    for (idx, c) in contents.chars().enumerate() {
+        if c != '(' {
+            continue;
+        }
+        if contents[idx - 2..idx + 2] == *"do()" {
+            enabled = true;
+        }
+        if contents[idx - 5..idx + 2] == *"don't()" {
+            enabled = false;
+        }
+        if contents[idx - 3..idx] != *"mul" {
+            continue;
+        }
+        let mut arg1_end: Option<usize> = None;
+        let mut arg2_end: Option<usize> = None;
+        for (idx_end, c_end) in contents[idx..idx + 9].chars().enumerate() {
+            if c_end == ',' {
+                arg1_end = Some(idx + idx_end);
+            }
+            if c_end == ')' {
+                arg2_end = Some(idx + idx_end);
+                break;
+            }
+        }
+        if arg1_end.is_none() || arg2_end.is_none() || arg1_end.unwrap() > arg2_end.unwrap() {
+            continue;
+        }
+
+        let arg1 = contents[idx + 1..arg1_end.unwrap()].parse::<i32>();
+        let arg2 = contents[arg1_end.unwrap() + 1..arg2_end.unwrap()].parse::<i32>();
+
+        if arg1.is_ok() && arg2.is_ok() {
+            let part = (arg1.unwrap(), arg2.unwrap());
+            parts.push(part);
+            if enabled {
+                enabled_parts.push(part);
+            }
+        }
+    }
+
+    let sum: i32 = parts.into_iter().map(|(a1, a2)| a1 * a2).sum();
+    println!("Day 3: {}", sum);
+    let sum: i32 = enabled_parts.into_iter().map(|(a1, a2)| a1 * a2).sum();
+    println!("Day 3, part 2: {}", sum);
 }
 
 #[derive(Parser)]
@@ -120,4 +174,5 @@ fn main() {
     let data_dir = Path::new(args.data_dir.trim());
     day1(data_dir);
     day2(data_dir);
+    day3(data_dir);
 }
