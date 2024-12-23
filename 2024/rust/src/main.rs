@@ -1,12 +1,13 @@
+use clap::Parser;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io;
 use std::iter::zip;
 use std::path::Path;
 
 fn read_file(data_dir: &Path, day: i32) -> String {
     let file_path = data_dir.join(format!("day{}.txt", day));
-    fs::read_to_string(file_path).expect("Can't read the file")
+    fs::read_to_string(file_path.clone())
+        .unwrap_or_else(|_| panic!("Can't read file {}", file_path.display()))
 }
 
 fn day1(data_dir: &Path) {
@@ -106,21 +107,17 @@ fn day2(data_dir: &Path) {
     println!("Day2, part2: {}", valid_with_dampner);
 }
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value = "data")]
+    data_dir: String,
+}
+
 fn main() {
-    println!("Please input data dir");
+    let args = Args::parse();
 
-    let mut input = String::new();
-
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read input");
-
-    input = input.trim().to_string();
-    if input.is_empty() {
-        input = "data".to_string();
-    }
-
-    let data_dir = Path::new(input.trim());
+    let data_dir = Path::new(args.data_dir.trim());
     day1(data_dir);
     day2(data_dir);
 }
