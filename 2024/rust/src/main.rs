@@ -29,7 +29,6 @@ fn day1(data_dir: &Path) {
     let sum: i32 = zip(&first_list, &second_list)
         .map(|(left, right)| (*left - *right).abs())
         .sum();
-    println!("Day 1: {}", sum);
 
     let mut counts: HashMap<i32, i32> = HashMap::new();
     for i in second_list {
@@ -43,7 +42,7 @@ fn day1(data_dir: &Path) {
         .map(|v| v * *counts.entry(v).or_default())
         .sum();
 
-    println!("Day 1, part2: {}", similarity);
+    println!("Day 1: {} P2: {}", sum, similarity);
 }
 
 fn day2(data_dir: &Path) {
@@ -83,7 +82,6 @@ fn day2(data_dir: &Path) {
         .map(|report| check_report(&report))
         .filter(|x| *x)
         .count();
-    println!("Day 2: {}", total_valid);
 
     // Reports are fairly short and I can't be bothered to re-write the checking logic properly
     let valid_with_dampner = reports
@@ -104,7 +102,7 @@ fn day2(data_dir: &Path) {
         .filter(|x| *x)
         .count();
 
-    println!("Day 2, part2: {}", valid_with_dampner);
+    println!("Day 2: {} P2: {}", total_valid, valid_with_dampner);
 }
 
 fn day3(data_dir: &Path) {
@@ -156,9 +154,128 @@ fn day3(data_dir: &Path) {
     }
 
     let sum: i32 = parts.into_iter().map(|(a1, a2)| a1 * a2).sum();
-    println!("Day 3: {}", sum);
-    let sum: i32 = enabled_parts.into_iter().map(|(a1, a2)| a1 * a2).sum();
-    println!("Day 3, part 2: {}", sum);
+    let sum2: i32 = enabled_parts.into_iter().map(|(a1, a2)| a1 * a2).sum();
+    println!("Day 3: {} P2: {}", sum, sum2);
+}
+
+#[derive(Debug, Clone)]
+struct Matrix<T> {
+    rows: i32,
+    cols: i32,
+    data: Vec<T>,
+}
+
+impl<T> Matrix<T>
+where
+    T: Default + Clone,
+{
+    pub fn new(rows: i32, cols: i32) -> Matrix<T> {
+        Matrix {
+            rows,
+            cols,
+            data: vec![T::default(); (rows * cols) as usize],
+        }
+    }
+
+    fn get_index(&self, row: i32, col: i32) -> Option<usize> {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return None;
+        }
+        Some((row * self.cols + col) as usize)
+    }
+
+    pub fn set(&mut self, row: i32, col: i32, value: T) {
+        let index = self.get_index(row, col);
+        self.data[index.unwrap()] = value;
+    }
+
+    pub fn get(&self, row: i32, col: i32) -> Option<&T> {
+        let index = self.get_index(row, col);
+        self.data.get(index?)
+    }
+}
+
+fn day4(data_dir: &Path) {
+    let contents = read_file(data_dir, 4);
+
+    let lines: Vec<&str> = contents.lines().collect();
+
+    let mut data: Matrix<char> = Matrix::new(lines.len() as i32, lines[0].len() as i32);
+    for (row, line) in lines.into_iter().enumerate() {
+        for (col, char) in line.chars().enumerate() {
+            data.set(row as i32, col as i32, char);
+        }
+    }
+
+    let mut xmas_total = 0;
+
+    let directions: Vec<(i32, i32)> = vec![
+        (-1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
+        (1, 0),
+        (1, -1),
+        (0, -1),
+        (-1, -1),
+    ];
+    let word_to_find = "XMAS";
+
+    for row in 0..(data.rows as i32) {
+        for col in 0..(data.cols as i32) {
+            if *data.get(row, col).unwrap() != 'X' {
+                continue;
+            }
+            for (row_dir, col_dir) in directions.iter() {
+                let mut candidate = String::new();
+                for (char_idx, char) in word_to_find.chars().enumerate().skip(1) {
+                    let char_get = data.get(
+                        row + char_idx as i32 * row_dir,
+                        col + char_idx as i32 * col_dir,
+                    );
+                    if char_get.is_none() || *char_get.unwrap() != char {
+                        break;
+                    }
+                    candidate.push(*char_get.unwrap());
+                    if char_idx == word_to_find.len() - 1 {
+                        xmas_total += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut x_mas_total = 0;
+
+    // TODO: Try using higher order functions here
+    for row in 0..(data.rows as i32) {
+        for col in 0..(data.cols as i32) {
+            if *data.get(row, col).unwrap() != 'A' {
+                continue;
+            }
+            let mut good_dir = [false; 2];
+            for (dir_idx, (row_dir, col_dir)) in
+                directions.iter().skip(1).step_by(2).take(2).enumerate()
+            {
+                let forward = data.get(row + row_dir, col + col_dir);
+                let backward = data.get(row + row_dir * -1, col + col_dir * -1);
+                if forward.is_none() || backward.is_none() {
+                    continue;
+                }
+                let f = *forward.unwrap();
+                let b = *backward.unwrap();
+                if (f, b) == ('M', 'S') || (f, b) == ('S', 'M') {
+                    good_dir[dir_idx] = true;
+                }
+            }
+
+            if good_dir.iter().all(|v| *v) {
+                x_mas_total += 1;
+            }
+        }
+    }
+
+    println!("Day 4: {} P2: {}", xmas_total, x_mas_total);
 }
 
 #[derive(Parser)]
@@ -175,4 +292,5 @@ fn main() {
     day1(data_dir);
     day2(data_dir);
     day3(data_dir);
+    day4(data_dir);
 }
