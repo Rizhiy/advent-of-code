@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::iter::zip;
@@ -199,7 +200,6 @@ fn day4(data_dir: &Path) {
     let contents = read_file(data_dir, 4);
 
     let lines: Vec<&str> = contents.lines().collect();
-
     let mut data: Matrix<char> = Matrix::new(lines.len() as i32, lines[0].len() as i32);
     for (row, line) in lines.into_iter().enumerate() {
         for (col, char) in line.chars().enumerate() {
@@ -278,6 +278,63 @@ fn day4(data_dir: &Path) {
     println!("Day 4: {} P2: {}", xmas_total, x_mas_total);
 }
 
+fn day5(data_dir: &Path) {
+    let contents = read_file(data_dir, 5);
+
+    let lines: Vec<&str> = contents.lines().collect();
+    let mut rules: HashSet<(i32, i32)> = HashSet::new();
+    let mut manuals: Vec<Vec<i32>> = Vec::new();
+    for line in lines.iter() {
+        if let Some((earlier, later)) = line.split_once('|') {
+            rules.insert((
+                earlier.parse::<i32>().unwrap(),
+                later.parse::<i32>().unwrap(),
+            ));
+        } else if !line.is_empty() {
+            manuals.push(
+                line.split(',')
+                    .map(|num| num.parse::<i32>().unwrap())
+                    .collect(),
+            )
+        }
+    }
+
+    let is_valid = |man: &Vec<i32>| {
+        man.iter().enumerate().all(|(idx, earlier)| {
+            man.iter()
+                .skip(idx + 1)
+                .all(|later| !rules.contains(&(*later, *earlier)))
+        })
+    };
+
+    let sum: i32 = manuals
+        .clone()
+        .into_iter()
+        .filter(is_valid)
+        .map(|man| man[man.len() / 2])
+        .sum();
+
+    let sum_invalid: i32 = manuals
+        .into_iter()
+        .filter(|man| !is_valid(man))
+        .map(|mut man| {
+            man.sort_by(|left, right| {
+                if rules.contains(&(*left, *right)) {
+                    Ordering::Less
+                } else if rules.contains(&(*right, *left)) {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            });
+            man
+        })
+        .map(|r_man| r_man[r_man.len() / 2])
+        .sum();
+
+    println!("Day 5: {} P2 {}", sum, sum_invalid);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -293,4 +350,5 @@ fn main() {
     day2(data_dir);
     day3(data_dir);
     day4(data_dir);
+    day5(data_dir);
 }
