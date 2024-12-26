@@ -1,4 +1,5 @@
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -335,6 +336,93 @@ fn day5(data_dir: &Path) {
     println!("Day 5: {} P2 {}", sum, sum_invalid);
 }
 
+fn day6(data_dir: &Path) {
+    let contents = read_file(data_dir, 6);
+
+    let lines: Vec<&str> = contents.lines().collect();
+    let (rows, cols) = (lines.len() as i32, lines[0].len() as i32);
+    // Not using Matrix, to try another approach
+    let mut obstractions: HashSet<(i32, i32)> = HashSet::new();
+    let mut starting_pos: (i32, i32) = (0, 0);
+    for (row_idx, row) in lines.iter().enumerate() {
+        for (col_idx, char) in row.chars().enumerate() {
+            let pos = (row_idx as i32, col_idx as i32);
+            if char == '#' {
+                obstractions.insert(pos);
+            } else if char == '^' {
+                starting_pos = pos;
+            }
+        }
+    }
+
+    fn run_guard_loop(
+        shape: (i32, i32),
+        obstractions: HashSet<(i32, i32)>,
+        starting_pos: (i32, i32),
+    ) -> usize {
+        let mut guard_pos = starting_pos;
+        let directions: HashMap<usize, (i32, i32)> = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+            .iter()
+            .cloned()
+            .enumerate()
+            .collect();
+        let mut guard_direction: usize = 0;
+
+        let mut visited: HashSet<(i32, i32)> = HashSet::new();
+        let mut total_steps = 0;
+
+        let get_next_pos = |guard_pos: (i32, i32), guard_direction: usize| {
+            let next_move = directions[&guard_direction];
+            (guard_pos.0 + next_move.0, guard_pos.1 + next_move.1)
+        };
+
+        // CBA with rays, lazy approach
+        loop {
+            visited.insert(guard_pos);
+            let mut next_pos = get_next_pos(guard_pos, guard_direction);
+            while obstractions.contains(&next_pos) {
+                guard_direction = (guard_direction + 1) % directions.len();
+                next_pos = get_next_pos(guard_pos, guard_direction);
+            }
+            if next_pos.0 < 0 || next_pos.0 >= shape.0 || next_pos.1 < 0 || next_pos.1 >= shape.1 {
+                return visited.len();
+            }
+            // This is faster than storing and checking visited+direction
+            if total_steps > shape.0 * shape.1 {
+                return 0;
+            }
+
+            total_steps += 1;
+            guard_pos = next_pos;
+        }
+    }
+
+    let total_visited = run_guard_loop((rows, cols), obstractions.clone(), starting_pos);
+
+    let pb = ProgressBar::new(rows as u64).with_prefix("Looking for obstractions to create loops");
+    let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
+    pb.set_style(ProgressStyle::with_template(template).unwrap());
+    // There is probably a smarter way to do this, but I can just wait a few seconds
+    let mut total_new_obstractions = 0;
+    for row_idx in 0..rows {
+        for col_idx in 0..cols {
+            let new_obstraction = (row_idx, col_idx);
+            if obstractions.contains(&new_obstraction) || new_obstraction == starting_pos {
+                continue;
+            }
+            let mut new_obstractions = obstractions.clone();
+            new_obstractions.insert(new_obstraction);
+            if run_guard_loop((rows, cols), new_obstractions, starting_pos) == 0 {
+                total_new_obstractions += 1;
+            }
+        }
+        pb.inc(1);
+    }
+    pb.finish_and_clear();
+
+    println!("Day 6: {} P2: {}", total_visited, total_new_obstractions);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -351,4 +439,5 @@ fn main() {
     day3(data_dir);
     day4(data_dir);
     day5(data_dir);
+    day6(data_dir);
 }
