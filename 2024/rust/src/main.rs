@@ -1,5 +1,6 @@
 use clap::Parser;
-// use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use std::cmp::{Ordering, PartialEq};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -333,7 +334,7 @@ fn day5(data_dir: &Path) {
         .map(|r_man| r_man[r_man.len() / 2])
         .sum();
 
-    println!("Day 5: {} P2 {}", sum, sum_invalid);
+    println!("Day 5: {} P2: {}", sum, sum_invalid);
 }
 
 fn day6(data_dir: &Path) {
@@ -399,29 +400,32 @@ fn day6(data_dir: &Path) {
 
     let total_visited = run_guard_loop((rows, cols), obstractions.clone(), starting_pos);
 
-    // let pb = ProgressBar::new(rows as u64).with_prefix("Looking for obstractions to create loops");
-    // let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
-    // pb.set_style(ProgressStyle::with_template(template).unwrap());
-    // // There is probably a smarter way to do this, but I can just wait a few seconds
-    // let mut total_new_obstractions = 0;
-    // for row_idx in 0..rows {
-    //     for col_idx in 0..cols {
-    //         let new_obstraction = (row_idx, col_idx);
-    //         if obstractions.contains(&new_obstraction) || new_obstraction == starting_pos {
-    //             continue;
-    //         }
-    //         let mut new_obstractions = obstractions.clone();
-    //         new_obstractions.insert(new_obstraction);
-    //         if run_guard_loop((rows, cols), new_obstractions, starting_pos) == 0 {
-    //             total_new_obstractions += 1;
-    //         }
-    //     }
-    //     pb.inc(1);
-    // }
-    // pb.finish_and_clear();
-    let total_new_obstractions = "Skipped";
+    let pb = ProgressBar::new(rows as u64).with_prefix("Looking for obstractions to create loops");
+    let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
+    pb.set_style(ProgressStyle::with_template(template).unwrap());
+    // There is probably a smarter way to do this, but I can just wait a few seconds
+    let total_new_observations: i32 = (0..rows)
+        .into_par_iter()
+        .map(|row_idx| {
+            let mut col_new_observations = 0;
+            for col_idx in 0..cols {
+                let new_obstraction = (row_idx, col_idx);
+                if obstractions.contains(&new_obstraction) || new_obstraction == starting_pos {
+                    continue;
+                }
+                let mut new_obstractions = obstractions.clone();
+                new_obstractions.insert(new_obstraction);
+                if run_guard_loop((rows, cols), new_obstractions, starting_pos) == 0 {
+                    col_new_observations += 1;
+                }
+            }
+            pb.inc(1);
+            col_new_observations
+        })
+        .sum();
+    pb.finish_and_clear();
 
-    println!("Day 6: {} P2: {}", total_visited, total_new_obstractions);
+    println!("Day 6: {} P2: {}", total_visited, total_new_observations);
 }
 
 fn day7(data_dir: &Path) {
@@ -434,20 +438,20 @@ fn day7(data_dir: &Path) {
         Join,
     }
 
-    fn check_ops(existing: i64, numbers: &[i64], target: i64) -> bool {
+    fn check_ops(existing: i64, numbers: &[i64], target: i64, ops: &Vec<Op>) -> bool {
         if numbers.is_empty() {
             return existing == target;
         }
-        for op in [Op::Add, Op::Mul, Op::Join] {
-            if existing == 0 && (op == Op::Mul || op == Op::Join) {
+        for op in ops.iter() {
+            if existing == 0 && (*op == Op::Mul || *op == Op::Join) {
                 continue;
             }
-            let res = match op {
-                Op::Add => check_ops(existing + numbers[0], &numbers[1..], target),
-                Op::Mul => check_ops(existing * numbers[0], &numbers[1..], target),
+            let res = match *op {
+                Op::Add => check_ops(existing + numbers[0], &numbers[1..], target, ops),
+                Op::Mul => check_ops(existing * numbers[0], &numbers[1..], target, ops),
                 Op::Join => {
                     let new: i64 = format!("{}{}", existing, numbers[0]).parse().unwrap();
-                    check_ops(new, &numbers[1..], target)
+                    check_ops(new, &numbers[1..], target, ops)
                 }
             };
             if res {
@@ -457,7 +461,7 @@ fn day7(data_dir: &Path) {
         false
     }
 
-    let sum: i64 = contents
+    let input: Vec<(Vec<i64>, i64)> = contents
         .lines()
         .map(|line| {
             let (target_str, numbers_str) = line.split_once(':').unwrap();
@@ -469,11 +473,22 @@ fn day7(data_dir: &Path) {
 
             (numbers, target)
         })
-        .filter(|(numbers, target)| check_ops(0, numbers, *target))
+        .collect();
+    let sum: i64 = input
+        .iter()
+        .filter(|&(numbers, target)| check_ops(0, numbers, *target, &vec![Op::Add, Op::Mul]))
         .map(|(_, target)| target)
         .sum();
 
-    println!("Day 7: {}", sum);
+    let sum_with_join: i64 = input
+        .iter()
+        .filter(|&(numbers, target)| {
+            check_ops(0, numbers, *target, &vec![Op::Add, Op::Mul, Op::Join])
+        })
+        .map(|(_, target)| target)
+        .sum();
+
+    println!("Day 7: {} P2: {}", sum, sum_with_join);
 }
 
 #[derive(Parser)]
