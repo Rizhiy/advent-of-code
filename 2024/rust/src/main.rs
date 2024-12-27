@@ -1,6 +1,6 @@
 use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
-use std::cmp::Ordering;
+// use indicatif::{ProgressBar, ProgressStyle};
+use std::cmp::{Ordering, PartialEq};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::iter::zip;
@@ -399,28 +399,81 @@ fn day6(data_dir: &Path) {
 
     let total_visited = run_guard_loop((rows, cols), obstractions.clone(), starting_pos);
 
-    let pb = ProgressBar::new(rows as u64).with_prefix("Looking for obstractions to create loops");
-    let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
-    pb.set_style(ProgressStyle::with_template(template).unwrap());
-    // There is probably a smarter way to do this, but I can just wait a few seconds
-    let mut total_new_obstractions = 0;
-    for row_idx in 0..rows {
-        for col_idx in 0..cols {
-            let new_obstraction = (row_idx, col_idx);
-            if obstractions.contains(&new_obstraction) || new_obstraction == starting_pos {
-                continue;
-            }
-            let mut new_obstractions = obstractions.clone();
-            new_obstractions.insert(new_obstraction);
-            if run_guard_loop((rows, cols), new_obstractions, starting_pos) == 0 {
-                total_new_obstractions += 1;
-            }
-        }
-        pb.inc(1);
-    }
-    pb.finish_and_clear();
+    // let pb = ProgressBar::new(rows as u64).with_prefix("Looking for obstractions to create loops");
+    // let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
+    // pb.set_style(ProgressStyle::with_template(template).unwrap());
+    // // There is probably a smarter way to do this, but I can just wait a few seconds
+    // let mut total_new_obstractions = 0;
+    // for row_idx in 0..rows {
+    //     for col_idx in 0..cols {
+    //         let new_obstraction = (row_idx, col_idx);
+    //         if obstractions.contains(&new_obstraction) || new_obstraction == starting_pos {
+    //             continue;
+    //         }
+    //         let mut new_obstractions = obstractions.clone();
+    //         new_obstractions.insert(new_obstraction);
+    //         if run_guard_loop((rows, cols), new_obstractions, starting_pos) == 0 {
+    //             total_new_obstractions += 1;
+    //         }
+    //     }
+    //     pb.inc(1);
+    // }
+    // pb.finish_and_clear();
+    let total_new_obstractions = "Skipped";
 
     println!("Day 6: {} P2: {}", total_visited, total_new_obstractions);
+}
+
+fn day7(data_dir: &Path) {
+    let contents = read_file(data_dir, 7);
+
+    #[derive(PartialEq)]
+    enum Op {
+        Add,
+        Mul,
+        Join,
+    }
+
+    fn check_ops(existing: i64, numbers: &[i64], target: i64) -> bool {
+        if numbers.is_empty() {
+            return existing == target;
+        }
+        for op in [Op::Add, Op::Mul, Op::Join] {
+            if existing == 0 && (op == Op::Mul || op == Op::Join) {
+                continue;
+            }
+            let res = match op {
+                Op::Add => check_ops(existing + numbers[0], &numbers[1..], target),
+                Op::Mul => check_ops(existing * numbers[0], &numbers[1..], target),
+                Op::Join => {
+                    let new: i64 = format!("{}{}", existing, numbers[0]).parse().unwrap();
+                    check_ops(new, &numbers[1..], target)
+                }
+            };
+            if res {
+                return true;
+            }
+        }
+        false
+    }
+
+    let sum: i64 = contents
+        .lines()
+        .map(|line| {
+            let (target_str, numbers_str) = line.split_once(':').unwrap();
+            let target: i64 = target_str.parse().unwrap();
+            let numbers: Vec<i64> = numbers_str[1..]
+                .split(' ')
+                .map(|s| s.trim().parse::<i64>().unwrap())
+                .collect();
+
+            (numbers, target)
+        })
+        .filter(|(numbers, target)| check_ops(0, numbers, *target))
+        .map(|(_, target)| target)
+        .sum();
+
+    println!("Day 7: {}", sum);
 }
 
 #[derive(Parser)]
@@ -440,4 +493,5 @@ fn main() {
     day4(data_dir);
     day5(data_dir);
     day6(data_dir);
+    day7(data_dir);
 }
