@@ -491,6 +491,90 @@ fn day7(data_dir: &Path) {
     println!("Day 7: {} P2: {}", sum, sum_with_join);
 }
 
+fn day8(data_dir: &Path) {
+    let contents = read_file(data_dir, 8);
+
+    let mut locations: HashMap<char, Vec<(i32, i32)>> = HashMap::new();
+
+    let lines: Vec<&str> = contents.lines().collect();
+
+    let (rows, cols) = (
+        lines.len() as i32,
+        lines.iter().next().unwrap().len() as i32,
+    );
+
+    for (row_idx, line) in lines.iter().enumerate() {
+        for (col_idx, char) in line.chars().enumerate() {
+            if char != '.' {
+                locations
+                    .entry(char)
+                    .or_default()
+                    .push((row_idx as i32, col_idx as i32));
+            }
+        }
+    }
+
+    fn get_all_antinodes(
+        locations: &[(i32, i32)],
+        rows: i32,
+        cols: i32,
+        harmonics: bool,
+    ) -> HashSet<(i32, i32)> {
+        let mut antinodes: HashSet<(i32, i32)> = HashSet::new();
+        if harmonics {
+            antinodes.insert(locations[0]);
+        }
+        if locations.len() < 2 {
+            return antinodes;
+        }
+        let current_ant = locations.iter().next().unwrap();
+        for other_ant in locations.iter().skip(1) {
+            let distance = (other_ant.0 - current_ant.0, other_ant.1 - current_ant.1);
+            for mult in [-1, 1] {
+                let mut scale = 1;
+                loop {
+                    if scale > 1 && !harmonics {
+                        break;
+                    }
+                    let base_ant = if mult == -1 { current_ant } else { other_ant };
+                    let antinode = (
+                        base_ant.0 + distance.0 * mult * scale,
+                        base_ant.1 + distance.1 * mult * scale,
+                    );
+                    if antinode.0 >= 0 && antinode.0 < rows && antinode.1 >= 0 && antinode.1 < cols
+                    {
+                        antinodes.insert(antinode);
+                    } else {
+                        break;
+                    }
+                    scale += 1;
+                }
+            }
+        }
+        antinodes
+            .union(&get_all_antinodes(&locations[1..], rows, cols, harmonics))
+            .copied()
+            .collect()
+    }
+
+    let all_antinodes = locations
+        .values()
+        .map(|char_locations| get_all_antinodes(char_locations, rows, cols, false))
+        .reduce(|acc, item| acc.union(&item).copied().collect())
+        .unwrap();
+    let all_antinodes_with_harmonics = locations
+        .values()
+        .map(|char_locations| get_all_antinodes(char_locations, rows, cols, true))
+        .reduce(|acc, item| acc.union(&item).copied().collect())
+        .unwrap();
+
+    println!(
+        "Day 8: {} P2: {}",
+        all_antinodes.len(),
+        all_antinodes_with_harmonics.len()
+    );
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -509,4 +593,5 @@ fn main() {
     day5(data_dir);
     day6(data_dir);
     day7(data_dir);
+    day8(data_dir);
 }
