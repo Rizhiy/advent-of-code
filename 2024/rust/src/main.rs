@@ -7,10 +7,18 @@ use std::fs;
 use std::iter::zip;
 use std::path::Path;
 
-fn read_file(data_dir: &Path, day: i32) -> String {
-    let file_path = data_dir.join(format!("day{}.txt", day));
+fn read_file_helper(data_dir: &Path, day: i32, example: bool) -> String {
+    let file_path = data_dir.join(format!(
+        "day{}{}.txt",
+        day,
+        if example { "_example" } else { "" }
+    ));
     fs::read_to_string(file_path.clone())
         .unwrap_or_else(|_| panic!("Can't read file {}", file_path.display()))
+}
+
+fn read_file(data_dir: &Path, day: i32) -> String {
+    read_file_helper(data_dir, day, false)
 }
 
 fn day1(data_dir: &Path) {
@@ -575,6 +583,110 @@ fn day8(data_dir: &Path) {
     );
 }
 
+fn day9(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 9, false);
+
+    let digits: Vec<u32> = contents
+        .trim()
+        .chars()
+        .map(|c| c.to_digit(10).unwrap())
+        .collect();
+
+    let mut working_digits = digits.clone();
+    let mut sum: usize = 0;
+    let mut counter: usize = 0;
+    let mut is_file = true;
+    let mut front_idx: usize = 0;
+    let mut back_idx = working_digits.len() / 2;
+
+    while !working_digits.is_empty() {
+        if working_digits[0] == 0 {
+            working_digits.remove(0);
+            if is_file {
+                front_idx += 1;
+            }
+            is_file = !is_file;
+            continue;
+        }
+        if is_file {
+            sum += counter * front_idx;
+        } else {
+            sum += counter * back_idx;
+            let end_idx = working_digits.len().wrapping_sub(1);
+            working_digits[end_idx] -= 1;
+            if working_digits[end_idx] == 0 {
+                // Remove last number and space before it
+                working_digits.pop();
+                working_digits.pop();
+                back_idx -= 1;
+            }
+        }
+        if working_digits.is_empty() {
+            break;
+        }
+        working_digits[0] -= 1;
+        counter += 1;
+    }
+
+    #[allow(dead_code)]
+    fn print_expanded(digits: &[u32], digit_idxs: &[usize]) {
+        let mut expanded = String::new();
+        for (idx, digit) in digits.iter().enumerate() {
+            for _ in 0..*digit {
+                if idx % 2 == 1 {
+                    expanded.push('.');
+                } else {
+                    expanded.push(char::from_digit(digit_idxs[idx] as u32, 10).unwrap());
+                }
+            }
+        }
+        println!("Expanded: {}", expanded);
+    }
+
+    let mut working_digits2 = digits.clone();
+    let mut back_idx = working_digits2.len() - 1;
+    let mut digit_idxs: Vec<usize> = (0..working_digits2.len())
+        .map(|d| if d % 2 == 1 { 0 } else { d / 2 })
+        .collect();
+
+    while back_idx > 0 {
+        let digit_to_move = working_digits2[back_idx];
+        for space_idx in (0..working_digits2.len()).skip(1).step_by(2) {
+            if space_idx > back_idx {
+                break;
+            }
+            if working_digits2[space_idx] >= digit_to_move {
+                // Remove digit from the end
+                working_digits2[back_idx] -= digit_to_move;
+                working_digits2[back_idx - 1] += digit_to_move;
+                let digit_idx = digit_idxs[back_idx];
+                digit_idxs[back_idx] = 0;
+                // insert digit at the front
+                working_digits2[space_idx] -= digit_to_move;
+                working_digits2.insert(space_idx, 0);
+                working_digits2.insert(space_idx + 1, digit_to_move);
+                digit_idxs.insert(space_idx, 0);
+                digit_idxs.insert(space_idx + 1, digit_idx);
+                // adjust since we inserted at the front
+                back_idx += 2;
+                break;
+            }
+        }
+        back_idx -= 2;
+    }
+
+    let mut sum2: usize = 0;
+    let mut counter: usize = 0;
+    for (digit, digit_idx) in working_digits2.iter().zip(digit_idxs) {
+        for _ in 0..*digit {
+            sum2 += counter * digit_idx;
+            counter += 1;
+        }
+    }
+
+    println!("Day 9: {} P2: {}", sum, sum2);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -594,4 +706,5 @@ fn main() {
     day6(data_dir);
     day7(data_dir);
     day8(data_dir);
+    day9(data_dir);
 }
