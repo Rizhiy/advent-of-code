@@ -584,7 +584,7 @@ fn day8(data_dir: &Path) {
 }
 
 fn day9(data_dir: &Path) {
-    let contents = read_file_helper(data_dir, 9, false);
+    let contents = read_file(data_dir, 9);
 
     let digits: Vec<u32> = contents
         .trim()
@@ -687,6 +687,89 @@ fn day9(data_dir: &Path) {
     println!("Day 9: {} P2: {}", sum, sum2);
 }
 
+fn day10(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 10, false);
+
+    let mut heights: HashMap<u32, HashSet<(i32, i32)>> = HashMap::new();
+
+    for (row_idx, line) in contents.lines().enumerate() {
+        for (col_idx, char) in line.chars().enumerate() {
+            heights
+                .entry(char.to_digit(10).unwrap())
+                .or_default()
+                .insert((row_idx as i32, col_idx as i32));
+        }
+    }
+
+    type ReachablePeaks = HashSet<(i32, i32)>;
+    let mut reachable_by_height: HashMap<u32, HashMap<(i32, i32), ReachablePeaks>> = HashMap::new();
+    for (row, col) in heights.get(&9).unwrap().iter().cloned() {
+        reachable_by_height
+            .entry(9)
+            .or_default()
+            .entry((row, col))
+            .or_default()
+            .insert((row, col));
+    }
+
+    for height in (0..*heights.keys().max().unwrap()).rev() {
+        for (row, col) in heights.get(&height).unwrap().iter().cloned() {
+            for (row_dir, col_dir) in [(-1, 0), (0, 1), (1, 0), (0, -1)].into_iter() {
+                let target_loc = (row + row_dir, col + col_dir);
+                let reachable_higher_all = reachable_by_height.get(&(height + 1)).unwrap();
+                if !reachable_higher_all.contains_key(&(target_loc)) {
+                    continue;
+                }
+                let reachable_higher_at_loc =
+                    reachable_higher_all.get(&target_loc).unwrap().clone();
+                reachable_by_height
+                    .entry(height)
+                    .or_default()
+                    .entry((row, col))
+                    .or_default()
+                    .extend(reachable_higher_at_loc);
+            }
+        }
+    }
+
+    let sum: i32 = reachable_by_height
+        .get(&0)
+        .unwrap()
+        .values()
+        .map(|set| set.len() as i32)
+        .sum();
+
+    let mut reachable_by_height_num: HashMap<u32, HashMap<(i32, i32), i32>> = HashMap::new();
+    for (row, col) in heights.get(&9).unwrap().iter().cloned() {
+        reachable_by_height_num
+            .entry(9)
+            .or_default()
+            .insert((row, col), 1);
+    }
+
+    for height in (0..*heights.keys().max().unwrap()).rev() {
+        for (row, col) in heights.get(&height).unwrap().iter().cloned() {
+            for (row_dir, col_dir) in [(-1, 0), (0, 1), (1, 0), (0, -1)].into_iter() {
+                let target_loc = (row + row_dir, col + col_dir);
+                let reachable_higher_all = reachable_by_height_num.get(&(height + 1)).unwrap();
+                if !reachable_higher_all.contains_key(&(target_loc)) {
+                    continue;
+                }
+                let reachable_higher_at_loc = *reachable_higher_all.get(&target_loc).unwrap();
+                *reachable_by_height_num
+                    .entry(height)
+                    .or_default()
+                    .entry((row, col))
+                    .or_default() += reachable_higher_at_loc;
+            }
+        }
+    }
+
+    let sum_num: i32 = reachable_by_height_num.get(&0).unwrap().values().sum();
+
+    println!("Day 10: {} P2: {}", sum, sum_num);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -707,4 +790,5 @@ fn main() {
     day7(data_dir);
     day8(data_dir);
     day9(data_dir);
+    day10(data_dir);
 }
