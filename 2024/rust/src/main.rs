@@ -770,6 +770,89 @@ fn day10(data_dir: &Path) {
     println!("Day 10: {} P2: {}", sum, sum_num);
 }
 
+fn day11(data_dir: &Path) {
+    let contents = read_file(data_dir, 11);
+
+    let stones: Vec<i64> = contents
+        .trim()
+        .split(' ')
+        .map(|s| s.parse::<i64>().unwrap())
+        .collect();
+
+    // initial implementation, not using in interest of execution speed
+    #[allow(dead_code)]
+    fn modify_stones(stones: &mut Vec<i64>, iters: usize) {
+        let pb = ProgressBar::new(iters as u64).with_prefix("Updating stones");
+        let template = "{prefix} {spinner} [{elapsed}] {wide_bar} {pos}/{len} ({eta})";
+        pb.set_style(ProgressStyle::with_template(template).unwrap());
+        for _ in 0..iters {
+            let mut idx = 0;
+            while idx < stones.len() {
+                let stone = stones[idx];
+                if stone == 0 {
+                    stones[idx] = 1;
+                } else if (stone as f32).log10().floor() as usize % 2 == 1 {
+                    let string = stone.to_string();
+                    let (first, second) = string.split_at(string.len() / 2);
+                    stones.remove(idx);
+                    stones.insert(idx, first.parse::<i64>().unwrap());
+                    stones.insert(idx + 1, second.parse::<i64>().unwrap());
+                    idx += 1;
+                } else {
+                    stones[idx] *= 2024;
+                }
+                idx += 1;
+            }
+            pb.inc(1);
+        }
+        pb.finish_and_clear();
+    }
+
+    fn sum_up_stones_dyn(stones: &mut [i64], iters: usize) -> usize {
+        // How many stones are produced after iterating number x by y times (x,y)
+        let mut cache: HashMap<(i64, usize), usize> = HashMap::new();
+
+        fn helper(num: i64, iter: usize, cache: &mut HashMap<(i64, usize), usize>) -> usize {
+            if cache.contains_key(&(num, iter)) {
+                return cache[&(num, iter)];
+            }
+            if iter == 0 {
+                return 1;
+            }
+            let mut new: Vec<i64> = Vec::new();
+            if num == 0 {
+                new.push(1);
+            } else if (num as f32).log10().floor() as usize % 2 == 1 {
+                let string = num.to_string();
+                let (first, second) = string.split_at(string.len() / 2);
+                new.push(first.parse::<i64>().unwrap());
+                new.push(second.parse::<i64>().unwrap());
+            } else {
+                new.push(num * 2024);
+            }
+            let mut total = 0;
+            for val in new.into_iter() {
+                let res = helper(val, iter - 1, cache);
+                cache.insert((val, iter - 1), res);
+                total += res;
+            }
+            total
+        }
+
+        let mut total = 0;
+        for stone in stones.iter() {
+            total += helper(*stone, iters, &mut cache);
+        }
+        total
+    }
+    let mut stones_p1 = stones.to_vec();
+    let sum = sum_up_stones_dyn(&mut stones_p1, 25);
+    let mut stones_p2 = stones.to_vec();
+    let sum2 = sum_up_stones_dyn(&mut stones_p2, 75);
+
+    println!("Day 11: {} P2: {}", sum, sum2);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -791,4 +874,5 @@ fn main() {
     day8(data_dir);
     day9(data_dir);
     day10(data_dir);
+    day11(data_dir);
 }
