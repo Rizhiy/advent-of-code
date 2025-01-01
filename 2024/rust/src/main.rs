@@ -1,7 +1,7 @@
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use std::cmp::{Ordering, PartialEq};
+use std::cmp::{max, min, Ordering, PartialEq};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::iter::zip;
@@ -19,6 +19,24 @@ fn read_file_helper(data_dir: &Path, day: i32, example: bool) -> String {
 
 fn read_file(data_dir: &Path, day: i32) -> String {
     read_file_helper(data_dir, day, false)
+}
+
+type Loc = (i32, i32);
+
+fn get_neighbours(loc: Loc, diagonals: bool) -> Vec<Loc> {
+    let mut neighbours: Vec<Loc> = Vec::new();
+    let mut directions = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
+    if diagonals {
+        directions.extend([(-1, 1), (1, 1), (1, -1), (-1, -1)]);
+    }
+    for dir in directions {
+        neighbours.push((loc.0 + dir.0, loc.1 + dir.1));
+    }
+    neighbours
+}
+
+fn check_loc(loc: Loc, shape: (i32, i32)) -> bool {
+    loc.0 >= 0 && loc.0 < shape.0 && loc.1 >= 0 && loc.1 < shape.1
 }
 
 fn day1(data_dir: &Path) {
@@ -189,7 +207,7 @@ where
     }
 
     fn get_index(&self, row: i32, col: i32) -> Option<usize> {
-        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+        if !check_loc((row, col), (self.rows, self.cols)) {
             return None;
         }
         Some((row * self.cols + col) as usize)
@@ -351,8 +369,8 @@ fn day6(data_dir: &Path) {
     let lines: Vec<&str> = contents.lines().collect();
     let (rows, cols) = (lines.len() as i32, lines[0].len() as i32);
     // Not using Matrix, to try another approach
-    let mut obstractions: HashSet<(i32, i32)> = HashSet::new();
-    let mut starting_pos: (i32, i32) = (0, 0);
+    let mut obstractions: HashSet<Loc> = HashSet::new();
+    let mut starting_pos: Loc = (0, 0);
     for (row_idx, row) in lines.iter().enumerate() {
         for (col_idx, char) in row.chars().enumerate() {
             let pos = (row_idx as i32, col_idx as i32);
@@ -364,11 +382,7 @@ fn day6(data_dir: &Path) {
         }
     }
 
-    fn run_guard_loop(
-        shape: (i32, i32),
-        obstractions: HashSet<(i32, i32)>,
-        starting_pos: (i32, i32),
-    ) -> usize {
+    fn run_guard_loop(shape: (i32, i32), obstractions: HashSet<Loc>, starting_pos: Loc) -> usize {
         let mut guard_pos = starting_pos;
         let directions: HashMap<usize, (i32, i32)> = [(-1, 0), (0, 1), (1, 0), (0, -1)]
             .iter()
@@ -377,10 +391,10 @@ fn day6(data_dir: &Path) {
             .collect();
         let mut guard_direction: usize = 0;
 
-        let mut visited: HashSet<(i32, i32)> = HashSet::new();
+        let mut visited: HashSet<Loc> = HashSet::new();
         let mut total_steps = 0;
 
-        let get_next_pos = |guard_pos: (i32, i32), guard_direction: usize| {
+        let get_next_pos = |guard_pos: Loc, guard_direction: usize| {
             let next_move = directions[&guard_direction];
             (guard_pos.0 + next_move.0, guard_pos.1 + next_move.1)
         };
@@ -393,7 +407,7 @@ fn day6(data_dir: &Path) {
                 guard_direction = (guard_direction + 1) % directions.len();
                 next_pos = get_next_pos(guard_pos, guard_direction);
             }
-            if next_pos.0 < 0 || next_pos.0 >= shape.0 || next_pos.1 < 0 || next_pos.1 >= shape.1 {
+            if !check_loc(next_pos, shape) {
                 return visited.len();
             }
             // This is faster than storing and checking visited+direction
@@ -502,7 +516,7 @@ fn day7(data_dir: &Path) {
 fn day8(data_dir: &Path) {
     let contents = read_file(data_dir, 8);
 
-    let mut locations: HashMap<char, Vec<(i32, i32)>> = HashMap::new();
+    let mut locations: HashMap<char, Vec<Loc>> = HashMap::new();
 
     let lines: Vec<&str> = contents.lines().collect();
 
@@ -522,13 +536,8 @@ fn day8(data_dir: &Path) {
         }
     }
 
-    fn get_all_antinodes(
-        locations: &[(i32, i32)],
-        rows: i32,
-        cols: i32,
-        harmonics: bool,
-    ) -> HashSet<(i32, i32)> {
-        let mut antinodes: HashSet<(i32, i32)> = HashSet::new();
+    fn get_all_antinodes(locations: &[Loc], rows: i32, cols: i32, harmonics: bool) -> HashSet<Loc> {
+        let mut antinodes: HashSet<Loc> = HashSet::new();
         if harmonics {
             antinodes.insert(locations[0]);
         }
@@ -690,7 +699,7 @@ fn day9(data_dir: &Path) {
 fn day10(data_dir: &Path) {
     let contents = read_file_helper(data_dir, 10, false);
 
-    let mut heights: HashMap<u32, HashSet<(i32, i32)>> = HashMap::new();
+    let mut heights: HashMap<u32, HashSet<Loc>> = HashMap::new();
 
     for (row_idx, line) in contents.lines().enumerate() {
         for (col_idx, char) in line.chars().enumerate() {
@@ -701,8 +710,8 @@ fn day10(data_dir: &Path) {
         }
     }
 
-    type ReachablePeaks = HashSet<(i32, i32)>;
-    let mut reachable_by_height: HashMap<u32, HashMap<(i32, i32), ReachablePeaks>> = HashMap::new();
+    type ReachablePeaks = HashSet<Loc>;
+    let mut reachable_by_height: HashMap<u32, HashMap<Loc, ReachablePeaks>> = HashMap::new();
     for (row, col) in heights.get(&9).unwrap().iter().cloned() {
         reachable_by_height
             .entry(9)
@@ -739,7 +748,7 @@ fn day10(data_dir: &Path) {
         .map(|set| set.len() as i32)
         .sum();
 
-    let mut reachable_by_height_num: HashMap<u32, HashMap<(i32, i32), i32>> = HashMap::new();
+    let mut reachable_by_height_num: HashMap<u32, HashMap<Loc, i32>> = HashMap::new();
     for (row, col) in heights.get(&9).unwrap().iter().cloned() {
         reachable_by_height_num
             .entry(9)
@@ -853,6 +862,112 @@ fn day11(data_dir: &Path) {
     println!("Day 11: {} P2: {}", sum, sum2);
 }
 
+fn day12(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 12, false);
+
+    let mut regions: HashMap<usize, HashSet<Loc>> = HashMap::new();
+    let mut loc2char: HashMap<Loc, char> = HashMap::new();
+    let mut loc2region: HashMap<Loc, usize> = HashMap::new();
+
+    let mut counter = 0;
+    for (row, line) in contents.lines().enumerate() {
+        for (col, char) in line.chars().enumerate() {
+            let loc = (row as i32, col as i32);
+            let region = counter;
+            counter += 1;
+            regions.entry(region).or_default().insert(loc);
+            loc2char.insert(loc, char);
+            loc2region.insert(loc, region);
+
+            for neighbour in get_neighbours(loc, false) {
+                if loc2char.contains_key(&neighbour) && *loc2char.get(&neighbour).unwrap() == char {
+                    let current_region = *loc2region.get(&loc).unwrap();
+                    let other_region = *loc2region.get(&neighbour).unwrap();
+                    if other_region != current_region {
+                        let joined_region = min(current_region, other_region);
+                        let region_to_remove = max(current_region, other_region);
+                        let region_to_remove_cells =
+                            regions.get(&region_to_remove).unwrap().clone();
+
+                        regions
+                            .entry(joined_region)
+                            .or_default()
+                            .extend(region_to_remove_cells.clone());
+
+                        for cell in region_to_remove_cells {
+                            loc2region.insert(cell, joined_region);
+                        }
+
+                        regions.remove(&region_to_remove);
+                    }
+                }
+            }
+        }
+    }
+
+    let perimiters: HashMap<usize, usize> = regions
+        .iter()
+        .map(|(region, cells)| {
+            let mut perimiter = 0;
+            for cell in cells {
+                for neighbour in get_neighbours(*cell, false) {
+                    if cells.contains(&neighbour) {
+                        continue;
+                    }
+                    perimiter += 1;
+                }
+            }
+            (*region, perimiter)
+        })
+        .clone()
+        .collect();
+
+    let total_price: usize = regions
+        .iter()
+        .map(|(region, cells)| cells.len() * perimiters.get(region).unwrap())
+        .sum();
+
+    let sides: HashMap<usize, usize> = regions
+        .iter()
+        .map(|(region, cells)| {
+            let mut side_cells: HashMap<(usize, i32), HashSet<i32>> = HashMap::new();
+            for cell in cells {
+                for (idx, neighbour) in get_neighbours(*cell, false).iter().enumerate() {
+                    if cells.contains(neighbour) {
+                        continue;
+                    }
+                    let horizontal = idx % 2 == 0;
+                    let loc = if horizontal { neighbour.0 } else { neighbour.1 };
+                    let cell_loc = if horizontal { cell.1 } else { cell.0 };
+                    side_cells.entry((idx, loc)).or_default().insert(cell_loc);
+                }
+            }
+            let mut sides = 0;
+            for values in side_cells.values() {
+                let mut v_vec: Vec<i32> = values.iter().cloned().collect();
+                v_vec.sort();
+                let mut prev = -2;
+                for value in v_vec {
+                    if value - prev > 1 {
+                        sides += 1;
+                    }
+                    prev = value;
+                }
+            }
+
+            (*region, sides)
+        })
+        .clone()
+        .collect();
+
+    let discount_price: usize = regions
+        .iter()
+        .map(|(region, cells)| cells.len() * sides.get(region).unwrap())
+        .sum();
+
+    println!("Day 12: {} P2: {}", total_price, discount_price);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -875,4 +990,5 @@ fn main() {
     day9(data_dir);
     day10(data_dir);
     day11(data_dir);
+    day12(data_dir);
 }
