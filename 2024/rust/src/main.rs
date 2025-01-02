@@ -968,6 +968,84 @@ fn day12(data_dir: &Path) {
     println!("Day 12: {} P2: {}", total_price, discount_price);
 }
 
+fn day13(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 13, false);
+
+    fn str_coords(line: &str) -> (i64, i64) {
+        let (_, rest) = line.split_once('X').to_owned().unwrap();
+        let (x, rest) = rest.split_once(',').to_owned().unwrap();
+        let (_, y) = rest.split_once('Y').to_owned().unwrap();
+        let to_i64 = |v: &str| v[1..].parse::<i64>().unwrap();
+        (to_i64(x), to_i64(y))
+    }
+
+    fn check_prize(inputs: &Vec<(i64, i64)>) -> Option<usize> {
+        let [a, b, target] = <[(i64, i64); 3]>::try_from(inputs.to_vec()).unwrap();
+
+        let mut b_mult = target.0 / b.0;
+        loop {
+            if b_mult < 0 {
+                break;
+            }
+            let a_target = (target.0 - b.0 * b_mult, target.1 - b.1 * b_mult);
+            if a_target.0 % a.0 == 0
+                && a_target.1 % a.1 == 0
+                && a_target.0 / a.0 == a_target.1 / a.1
+            {
+                return Some((a_target.0 / a.0 * 3 + b_mult) as usize);
+            }
+            b_mult -= 1;
+        }
+
+        None
+    }
+
+    // Why is there maths in my coding challenge???
+    fn check_prize_math(inputs: &Vec<(i64, i64)>, extra_target: i64) -> Option<usize> {
+        let [a, b, mut t] = <[(i64, i64); 3]>::try_from(inputs.to_vec()).unwrap();
+        t = (t.0 + extra_target, t.1 + extra_target);
+
+        // a.0 * i + b.0 * j = t.0
+        // a.1 * i + b.1 * j = t.1
+        // i = (t.0 - b.0 * j) / a.0
+        // a.1 * (t.0 - b.0 * j) / a.0 + b.1 * j = t.1
+        // a.1 * (t.0 - b.0 * j) + b.1 * j * a.0 = t.1 * a.0
+        // a.1 * t.0 - a.1 * b.0 * j + b.1 * j * a.0 = t.1 * a.0
+        // - a.1 * b.0 * j + b.1 * j * a.0 = t.1 * a.0 - a.1 * t.0
+        // j * (- a.1 * b.0 + b.1 * a.0) = t.1 * a.0 - a.1 * t.0
+
+        // j = (a.0 * t.1 - a.1 * t.0) / (a.0 * b.1 - a.1 * b.0)
+        // i = (t.0 - b.0 * j) / a.0
+
+        let b_mult = (a.0 * t.1 - a.1 * t.0) / (a.0 * b.1 - a.1 * b.0);
+        let a_mult = (t.0 - b.0 * b_mult) / a.0;
+        if a.0 * a_mult + b.0 * b_mult == t.0 && a.1 * a_mult + b.1 * b_mult == t.1 {
+            Some((a_mult * 3 + b_mult) as usize)
+        } else {
+            None
+        }
+    }
+
+    let machines: Vec<Vec<(i64, i64)>> = contents
+        .trim()
+        .split("\n\n")
+        .map(|lines| {
+            lines
+                .split('\n')
+                .map(str_coords)
+                .collect::<Vec<(i64, i64)>>()
+        })
+        .collect();
+
+    let score: usize = machines.iter().flat_map(check_prize).sum();
+    let score2: usize = machines
+        .iter()
+        .flat_map(|m| check_prize_math(m, 10000000000000))
+        .sum();
+
+    println!("Day 13: {} P2: {}", score, score2);
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -991,4 +1069,5 @@ fn main() {
     day10(data_dir);
     day11(data_dir);
     day12(data_dir);
+    day13(data_dir);
 }
