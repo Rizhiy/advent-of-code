@@ -1045,6 +1045,101 @@ fn day13(data_dir: &Path) {
 
     println!("Day 13: {} P2: {}", score, score2);
 }
+fn day14(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 14, false);
+
+    let width = 101;
+    let height = 103;
+    // let width = 11;
+    // let height = 7;
+
+    type Robot = (Loc, Loc);
+
+    let robots: Vec<(Loc, Loc)> = contents
+        .lines()
+        .map(|line| {
+            let (pos_str, vel_str) = line.split_once(' ').unwrap();
+            let to_num = |s: &str| s.parse::<i32>().unwrap();
+            let convert = |s: &str| {
+                let (left, right) = s[2..].split_once(',').unwrap();
+                (to_num(left), to_num(right))
+            };
+            (convert(pos_str), convert(vel_str))
+        })
+        .collect();
+
+    let calc_future_pos = |&(pos, vec): &Robot, iters: i32| {
+        let mut pos2 = (pos.0 + vec.0 * iters, pos.1 + vec.1 * iters);
+        while pos2.0 < 0 {
+            pos2.0 += width;
+        }
+        while pos2.1 < 0 {
+            pos2.1 += height;
+        }
+        (pos2.0 % width, pos2.1 % height)
+    };
+
+    let advance_all_robots = |robots: &Vec<Robot>, iters: i32| {
+        robots
+            .iter()
+            .map(|robot| calc_future_pos(robot, iters))
+            .collect::<Vec<Loc>>()
+    };
+
+    let final_pos: Vec<Loc> = advance_all_robots(&robots, 100);
+
+    let mut quadrants: HashMap<i32, i32> = HashMap::new();
+    let (half_w, half_h) = (width / 2, height / 2);
+    for f_pos in final_pos.iter() {
+        if f_pos.0 == half_w || f_pos.1 == half_h {
+            continue;
+        }
+        *quadrants
+            .entry(f_pos.0 / (half_w + 1) + f_pos.1 / (half_h + 1) * 2)
+            .or_default() += 1;
+    }
+
+    let prod: i32 = quadrants.values().product();
+
+    #[allow(unused_variables)]
+    let print_pos = |positions: &[Loc]| {
+        let mut pic = String::new();
+        let pos_set: HashSet<Loc> = positions.iter().cloned().collect();
+        for row in 0..height {
+            for col in 0..width {
+                if pos_set.contains(&(col, row)) {
+                    pic.push('x');
+                } else {
+                    pic.push('.');
+                }
+            }
+            pic.push('\n');
+        }
+        print!("{}", pic);
+    };
+
+    #[allow(unused_variables)]
+    let is_tree_like = |positions: &[Loc]| {
+        let mut row_counts: HashMap<i32, i32> = HashMap::new();
+        let mut col_counts: HashMap<i32, i32> = HashMap::new();
+
+        for (col, row) in positions.iter() {
+            *row_counts.entry(*row).or_default() += 1;
+            *col_counts.entry(*col).or_default() += 1;
+        }
+        *row_counts.values().max().unwrap() > 30 || *col_counts.values().max().unwrap() > 30
+    };
+
+    // for idx in 0..10000 {
+    //     let idx_positions = advance_all_robots(&robots, idx);
+    //     if is_tree_like(&idx_positions) {
+    //         println!("{}", idx);
+    //         print_pos(&idx_positions);
+    //     }
+    // }
+
+    println!("Day 14: {} P2: {}", prod, "<run code and check visually>");
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -1070,4 +1165,5 @@ fn main() {
     day11(data_dir);
     day12(data_dir);
     day13(data_dir);
+    day14(data_dir);
 }
