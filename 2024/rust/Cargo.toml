@@ -4,6 +4,7 @@ version = "0.3.0"
 edition = "2021"
 
 [dependencies]
+bimap = "0.6.3"
 clap = {version= "4.5.23", features = ["derive"]}
 indicatif = "0.17.9"
 rand = "0"

@@ -1,8 +1,9 @@
+use bimap::BiMap;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::cmp::{max, min, Ordering, PartialEq};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::iter::zip;
 use std::path::Path;
@@ -22,12 +23,21 @@ fn read_file(data_dir: &Path, day: i32) -> String {
 }
 
 type Loc = (i32, i32);
+const DIRECTIONS: [(i32, i32); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+const DIAG_DIRECTIONS: [(i32, i32); 4] = [(-1, 1), (1, 1), (1, -1), (-1, -1)];
+
+fn get_next_by_direction(loc: Loc, direction: usize) -> Loc {
+    (
+        loc.0 + DIRECTIONS[direction].0,
+        loc.1 + DIRECTIONS[direction].1,
+    )
+}
 
 fn get_neighbours(loc: Loc, diagonals: bool) -> Vec<Loc> {
     let mut neighbours: Vec<Loc> = Vec::new();
-    let mut directions = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
+    let mut directions = DIRECTIONS.to_vec();
     if diagonals {
-        directions.extend([(-1, 1), (1, 1), (1, -1), (-1, -1)]);
+        directions.extend(DIAG_DIRECTIONS);
     }
     for dir in directions {
         neighbours.push((loc.0 + dir.0, loc.1 + dir.1));
@@ -237,16 +247,7 @@ fn day4(data_dir: &Path) {
 
     let mut xmas_total = 0;
 
-    let directions: Vec<(i32, i32)> = vec![
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-        (1, 1),
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, -1),
-    ];
+    let directions = [DIRECTIONS, DIAG_DIRECTIONS].concat();
     let word_to_find = "XMAS";
 
     for row in 0..(data.rows as i32) {
@@ -384,11 +385,8 @@ fn day6(data_dir: &Path) {
 
     fn run_guard_loop(shape: (i32, i32), obstractions: HashSet<Loc>, starting_pos: Loc) -> usize {
         let mut guard_pos = starting_pos;
-        let directions: HashMap<usize, (i32, i32)> = [(-1, 0), (0, 1), (1, 0), (0, -1)]
-            .iter()
-            .cloned()
-            .enumerate()
-            .collect();
+        let directions: HashMap<usize, (i32, i32)> =
+            DIRECTIONS.iter().cloned().enumerate().collect();
         let mut guard_direction: usize = 0;
 
         let mut visited: HashSet<Loc> = HashSet::new();
@@ -520,10 +518,7 @@ fn day8(data_dir: &Path) {
 
     let lines: Vec<&str> = contents.lines().collect();
 
-    let (rows, cols) = (
-        lines.len() as i32,
-        lines.iter().next().unwrap().len() as i32,
-    );
+    let (rows, cols) = (lines.len() as i32, lines.first().unwrap().len() as i32);
 
     for (row_idx, line) in lines.iter().enumerate() {
         for (col_idx, char) in line.chars().enumerate() {
@@ -979,6 +974,7 @@ fn day13(data_dir: &Path) {
         (to_i64(x), to_i64(y))
     }
 
+    #[allow(clippy::ptr_arg)]
     fn check_prize(inputs: &Vec<(i64, i64)>) -> Option<usize> {
         let [a, b, target] = <[(i64, i64); 3]>::try_from(inputs.to_vec()).unwrap();
 
@@ -1001,6 +997,7 @@ fn day13(data_dir: &Path) {
     }
 
     // Why is there maths in my coding challenge???
+    #[allow(clippy::ptr_arg)]
     fn check_prize_math(inputs: &Vec<(i64, i64)>, extra_target: i64) -> Option<usize> {
         let [a, b, mut t] = <[(i64, i64); 3]>::try_from(inputs.to_vec()).unwrap();
         t = (t.0 + extra_target, t.1 + extra_target);
@@ -1138,7 +1135,171 @@ fn day14(data_dir: &Path) {
     //     }
     // }
 
-    println!("Day 14: {} P2: {}", prod, "<run code and check visually>");
+    println!("Day 14: {} P2: <run code and check visually>", prod);
+}
+
+fn day15(data_dir: &Path) {
+    let contents = read_file_helper(data_dir, 15, false);
+
+    let mut robot: Loc = (0, 0);
+    let mut boxes: HashSet<Loc> = HashSet::new();
+    let mut walls: HashSet<Loc> = HashSet::new();
+    let mut moves: Vec<usize> = Vec::new();
+
+    for (row, line) in contents.lines().enumerate() {
+        for (col, char) in line.chars().enumerate() {
+            let loc = (row as i32, col as i32);
+            if char == '#' {
+                walls.insert(loc);
+            } else if char == 'O' {
+                boxes.insert(loc);
+            } else if char == '@' {
+                robot = loc;
+            } else if let '^' | '>' | 'v' | '<' = char {
+                moves.push(match char {
+                    '^' => 0,
+                    '>' => 1,
+                    'v' => 2,
+                    '<' => 3,
+                    // Should not happen given the above if
+                    _ => 4,
+                })
+            }
+        }
+    }
+
+    let mut robot2 = (robot.0, robot.1 * 2);
+    let mut boxes2: HashSet<Loc> = boxes.iter().map(|(x, y)| (*x, y * 2)).collect();
+    // This solution is ugly, but simple to implement
+    // TODO: Try to refactor to use structs
+    let mut linked_boxes: BiMap<Loc, Loc> = boxes2.iter().map(|l| (*l, (l.0, l.1 + 1))).collect();
+    boxes2.extend(
+        boxes2
+            .iter()
+            .map(|(x, y)| (*x, y + 1))
+            .collect::<HashSet<Loc>>(),
+    );
+
+    let mut walls2: HashSet<Loc> = walls.iter().map(|(x, y)| (*x, y * 2)).collect();
+    walls2.extend(
+        walls2
+            .iter()
+            .map(|(x, y)| (*x, y + 1))
+            .collect::<HashSet<Loc>>(),
+    );
+
+    'moves_loop: for move_ in moves.clone() {
+        // Technically not required to store all of them, but options are annoying
+        let mut boxes_to_move: Vec<Loc> = Vec::new();
+        let mut current_loc = robot;
+        let mut next_loc = get_next_by_direction(current_loc, move_);
+        loop {
+            if walls.contains(&next_loc) {
+                continue 'moves_loop;
+            }
+            if boxes.contains(&next_loc) {
+                boxes_to_move.push(next_loc);
+                current_loc = next_loc;
+                next_loc = get_next_by_direction(current_loc, move_);
+                continue;
+            }
+            break;
+        }
+        if !boxes_to_move.is_empty() {
+            boxes.remove(boxes_to_move.first().unwrap());
+            boxes.insert(next_loc);
+        }
+        robot = get_next_by_direction(robot, move_);
+    }
+
+    let sum: i32 = boxes.iter().map(|(row, col)| row * 100 + col).sum();
+
+    #[allow(dead_code)]
+    fn print_state2(
+        robot2: Loc,
+        walls2: &HashSet<Loc>,
+        boxes2: &HashSet<Loc>,
+        linked_boxes: &BiMap<Loc, Loc>,
+    ) {
+        let height = walls2.iter().map(|l| l.0).max().unwrap();
+        let width = walls2.iter().map(|l| l.1).max().unwrap();
+
+        for row in 0..height {
+            let mut s = String::new();
+            for col in 0..width {
+                let loc = (row, col);
+                if walls2.contains(&loc) {
+                    s.push('#');
+                } else if boxes2.contains(&loc) {
+                    if linked_boxes.contains_left(&loc) {
+                        s.push('[');
+                    } else {
+                        s.push(']');
+                    }
+                } else if loc == robot2 {
+                    s.push('@');
+                } else {
+                    s.push('.');
+                }
+            }
+            println!("{}", s);
+        }
+    }
+
+    'moves_loop2: for move_ in moves {
+        let mut checked_locs: HashSet<Loc> = HashSet::new();
+        let mut locs_to_check: VecDeque<Loc> = VecDeque::from([robot2]);
+        let mut changes: Vec<Loc> = Vec::new();
+
+        while !locs_to_check.is_empty() {
+            let loc = locs_to_check.pop_front().unwrap();
+            if checked_locs.contains(&loc) {
+                continue;
+            }
+            checked_locs.insert(loc);
+
+            let next_loc = get_next_by_direction(loc, move_);
+            if walls2.contains(&next_loc) {
+                continue 'moves_loop2;
+            }
+            changes.push(loc);
+
+            if linked_boxes.contains_left(&loc) {
+                locs_to_check.push_back(*linked_boxes.get_by_left(&loc).unwrap());
+            }
+            if linked_boxes.contains_right(&loc) {
+                locs_to_check.push_back(*linked_boxes.get_by_right(&loc).unwrap());
+            }
+            if boxes2.contains(&next_loc) {
+                locs_to_check.push_back(next_loc);
+            }
+        }
+
+        let boxes_to_move: Vec<Loc> = changes.into_iter().skip(1).rev().collect();
+        for box_ in boxes_to_move {
+            boxes2.remove(&box_);
+            let next_loc = get_next_by_direction(box_, move_);
+            boxes2.insert(next_loc);
+            if linked_boxes.contains_left(&box_) {
+                let right_box = *linked_boxes.get_by_left(&box_).unwrap();
+                linked_boxes.remove_by_left(&box_);
+                linked_boxes.insert(next_loc, right_box);
+            } else {
+                let left_box = *linked_boxes.get_by_right(&box_).unwrap();
+                linked_boxes.remove_by_right(&box_);
+                linked_boxes.insert(left_box, next_loc);
+            }
+        }
+        robot2 = get_next_by_direction(robot2, move_);
+    }
+
+    for linked_box in linked_boxes.right_values() {
+        boxes2.remove(linked_box);
+    }
+
+    let sum2: i32 = boxes2.iter().map(|(row, col)| row * 100 + col).sum();
+
+    println!("Day 15: {} P2: {}", sum, sum2);
 }
 
 #[derive(Parser)]
@@ -1166,4 +1327,5 @@ fn main() {
     day12(data_dir);
     day13(data_dir);
     day14(data_dir);
+    day15(data_dir);
 }
